@@ -1,0 +1,15 @@
+services:
+  pulse-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8088:8088"
+    volumes:
+      # Persist downloaded attachments
+      - ./backend/downloads:/app/backend/downloads
+      # Optional: persist request info text files
+      - ./backend/requests:/app/backend/requests
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai

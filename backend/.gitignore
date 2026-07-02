@@ -1,1 +1,9 @@
 .venv
+__pycache__
+*.pyc
+requests/
+downloads/
+*.egg-info
+.egg
+dist/
+build/

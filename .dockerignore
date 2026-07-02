@@ -1,0 +1,29 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Node / frontend
+frontend/node_modules/
+frontend/.pnpm-store/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.reasonix/
+.idea/
+.vscode/
+
+# Runtime (bind-mounted as volumes)
+backend/downloads/
+backend/requests/
+
+# OS
+.DS_Store
+Thumbs.db

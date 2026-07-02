@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { Button } from '@/components/ui/button'
+import ImageGallery from '@/components/ImageGallery.vue'
 </script>
 
 <template>
-  <div>
-    <Button>Click me</Button>
-  </div>
+  <ImageGallery />
 </template>

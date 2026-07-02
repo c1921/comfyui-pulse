@@ -1,7 +1,14 @@
 [project]
-name = "backend"
+name = "pulse-server"
 version = "0.1.0"
-description = "Add your description here"
+description = "Local HTTP request capture server for ComfyUI Pulse"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = []
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
