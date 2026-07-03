@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/capture_file.dart';
@@ -82,34 +83,18 @@ class _LightboxState extends State<Lightbox> {
               return InteractiveViewer(
                 maxScale: 5.0,
                 child: Center(
-                  child: Image.network(
-                    file.downloadUrl,
-                    fit: BoxFit.contain,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                              : null,
-                          color: Colors.white70,
+                  child: file.localPath != null
+                      ? Image.file(
+                          File(file.localPath!),
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) =>
+                              _buildImageError(file),
+                        )
+                      : Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white70,
+                          ),
                         ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) => Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.broken_image,
-                            size: 64, color: Colors.white54),
-                        const SizedBox(height: 8),
-                        Text(
-                          file.name,
-                          style: const TextStyle(color: Colors.white54),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
               );
             },
@@ -177,6 +162,20 @@ class _LightboxState extends State<Lightbox> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildImageError(CaptureFile file) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.broken_image, size: 64, color: Colors.white54),
+        const SizedBox(height: 8),
+        Text(
+          file.name,
+          style: const TextStyle(color: Colors.white54),
+        ),
+      ],
     );
   }
 }

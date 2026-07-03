@@ -149,15 +149,6 @@ class CaptureProvider extends ChangeNotifier {
     }
   }
 
-  /// Save a single file to the selected directory.
-  Future<void> saveFile(CaptureFile file) async {
-    if (_selectedDirPath == null) {
-      await pickDirectory();
-      if (_selectedDirPath == null) return;
-    }
-    await _trySaveFile(file);
-  }
-
   Future<void> _trySaveFile(CaptureFile file) async {
     if (_selectedDirPath == null || _savingFiles.contains(file.name)) return;
 
@@ -165,7 +156,8 @@ class CaptureProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await http.get(Uri.parse(file.downloadUrl));
+      final response = await http.get(
+          Uri.parse(file.downloadUrl(_apiClient.baseUrl)));
       if (response.statusCode != 200) {
         throw HttpException('HTTP ${response.statusCode}');
       }
@@ -178,6 +170,7 @@ class CaptureProvider extends ChangeNotifier {
       final saveFile = File('${saveDir.path}/${file.name}');
       await saveFile.writeAsBytes(response.bodyBytes);
       file.saved = true;
+      file.localPath = saveFile.path;
     } catch (e) {
       debugPrint('Failed to save ${file.name}: $e');
     } finally {

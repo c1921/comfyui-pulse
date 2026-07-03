@@ -6,6 +6,7 @@ class CaptureFile {
   final String contentType;
   final bool isImage;
   bool saved;
+  String? localPath;
 
   CaptureFile({
     required this.name,
@@ -15,6 +16,7 @@ class CaptureFile {
     required this.contentType,
     required this.isImage,
     this.saved = false,
+    this.localPath,
   });
 
   factory CaptureFile.fromJson(Map<String, dynamic> json) {
@@ -34,5 +36,6 @@ class CaptureFile {
     return '${(size / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
-  String get downloadUrl => path;
+  /// Build a full download URL by prepending the backend base URL.
+  String downloadUrl(String baseUrl) => '$baseUrl$path';
 }

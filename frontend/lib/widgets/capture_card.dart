@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/capture_file.dart';
@@ -5,17 +6,13 @@ import '../models/capture_file.dart';
 class CaptureCard extends StatelessWidget {
   final CaptureFile file;
   final bool isNew;
-  final bool isSaving;
   final VoidCallback? onTap;
-  final VoidCallback? onSave;
 
   const CaptureCard({
     super.key,
     required this.file,
     required this.isNew,
-    required this.isSaving,
     this.onTap,
-    this.onSave,
   });
 
   @override
@@ -47,17 +44,15 @@ class CaptureCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   // Image preview or file icon
-                  if (file.isImage)
-                    Image.network(
-                      file.downloadUrl,
+                  if (file.isImage && file.localPath != null)
+                    Image.file(
+                      File(file.localPath!),
                       fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return _buildPlaceholder(theme);
-                      },
                       errorBuilder: (context, error, stackTrace) =>
-                          _buildPlaceholder(theme),
+                          _buildErrorIcon(theme),
                     )
+                  else if (file.isImage)
+                    _buildPlaceholder(theme)
                   else
                     _buildFileIcon(theme),
 
@@ -89,17 +84,6 @@ class CaptureCard extends StatelessWidget {
               ),
             ),
           ),
-
-          // Save button overlay on hover (always visible on mobile)
-          if (onSave != null)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: _SaveButton(
-                isSaving: isSaving,
-                onSave: onSave!,
-              ),
-            ),
 
           // Info footer
           Padding(
@@ -151,6 +135,19 @@ class CaptureCard extends StatelessWidget {
     );
   }
 
+  Widget _buildErrorIcon(ThemeData theme) {
+    return Container(
+      color: theme.colorScheme.surfaceContainerHighest,
+      child: Center(
+        child: Icon(
+          Icons.broken_image_outlined,
+          size: 32,
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFileIcon(ThemeData theme) {
     return Container(
       color: theme.colorScheme.surfaceContainerHighest,
@@ -187,56 +184,5 @@ class CaptureCard extends StatelessWidget {
     } catch (_) {
       return iso;
     }
-  }
-}
-
-class _SaveButton extends StatefulWidget {
-  final bool isSaving;
-  final VoidCallback onSave;
-
-  const _SaveButton({required this.isSaving, required this.onSave});
-
-  @override
-  State<_SaveButton> createState() => _SaveButtonState();
-}
-
-class _SaveButtonState extends State<_SaveButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 200),
-        opacity: _hovered || widget.isSaving ? 1.0 : 0.0,
-        child: Material(
-          color: Colors.black54,
-          borderRadius: BorderRadius.circular(8),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: widget.onSave,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              child: widget.isSaving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.greenAccent,
-                      ),
-                    )
-                  : const Icon(
-                      Icons.download,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }

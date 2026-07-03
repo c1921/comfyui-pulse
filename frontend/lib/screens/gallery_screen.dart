@@ -57,11 +57,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   SliverToBoxAdapter(
                     child: _buildHeader(context, provider),
                   ),
-                  if (provider.selectedDirPath == null &&
-                      provider.captures.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: _buildSavePrompt(context),
-                    ),
                   if (!provider.isConnected &&
                       !provider.loading &&
                       !provider.isConnecting &&
@@ -212,36 +207,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
     );
   }
 
-  Widget _buildSavePrompt(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.amber.withValues(alpha: 0.1),
-          border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.info_outline,
-                size: 20, color: Colors.amber.shade300),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                '选择保存目录后，新图片将自动写入本地文件夹',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.amber.shade200,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildConnectionStatus(
       ThemeData theme, CaptureProvider provider) {
     if (provider.isConnecting) {
@@ -371,11 +336,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
           (context, index) {
             final file = provider.captures[index];
             final isNew = provider.newNames.contains(file.name);
-            final isSaving = provider.savingFiles.contains(file.name);
             return CaptureCard(
               file: file,
               isNew: isNew,
-              isSaving: isSaving,
               onTap: file.isImage
                   ? () {
                       final imageIndex =
@@ -385,7 +348,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       }
                     }
                   : null,
-              onSave: () => provider.saveFile(file),
             );
           },
           childCount: provider.captures.length,
