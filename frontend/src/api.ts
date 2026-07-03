@@ -12,6 +12,7 @@ export interface CaptureFile {
   mtime: string
   content_type: string
   is_image: boolean
+  _saved?: boolean
 }
 
 export interface CapturesResponse {
