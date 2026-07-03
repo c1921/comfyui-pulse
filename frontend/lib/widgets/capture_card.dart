@@ -48,6 +48,7 @@ class CaptureCard extends StatelessWidget {
                     Image.file(
                       File(file.localPath!),
                       fit: BoxFit.cover,
+                      cacheWidth: 320,
                       errorBuilder: (context, error, stackTrace) =>
                           _buildErrorIcon(theme),
                     )
@@ -151,36 +152,22 @@ class CaptureCard extends StatelessWidget {
   Widget _buildFileIcon(ThemeData theme) {
     return Container(
       color: theme.colorScheme.surfaceContainerHighest,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.description_outlined,
-            size: 40,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-          ),
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              file.name,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ],
+      child: Center(
+        child: Icon(
+          Icons.description_outlined,
+          size: 40,
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+        ),
       ),
     );
   }
 
+  static final _dateFormat = DateFormat('MM/dd HH:mm');
+
   String _formatTime(String iso) {
     try {
       final d = DateTime.parse(iso);
-      return DateFormat('MM/dd HH:mm').format(d);
+      return _dateFormat.format(d);
     } catch (_) {
       return iso;
     }

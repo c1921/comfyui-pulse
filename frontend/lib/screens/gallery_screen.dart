@@ -45,56 +45,112 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      body: Consumer<CaptureProvider>(
-        builder: (context, provider, child) {
-          return Stack(
-            children: [
-              CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: _buildHeader(context, provider),
+      body: Stack(
+        children: [
+          CustomScrollView(
+            slivers: [
+              // Header: captureCount, loading, isConnected, selectedDirPath
+              SliverToBoxAdapter(
+                child: Selector<CaptureProvider, _HeaderData>(
+                  selector: (_, p) => _HeaderData(
+                    captureCount: p.captureCount,
+                    loading: p.loading,
+                    isConnected: p.isConnected,
+                    isConnecting: p.isConnecting,
+                    selectedDirPath: p.selectedDirPath,
                   ),
-                  if (!provider.isConnected &&
-                      !provider.loading &&
-                      !provider.isConnecting &&
-                      provider.captures.isNotEmpty)
-                    SliverToBoxAdapter(
+                  builder: (context, data, _) =>
+                      _buildHeader(context, data),
+                ),
+              ),
+              // Connection error banner (visible when disconnected with captures)
+              Selector<CaptureProvider, _ConnectionStatus>(
+                shouldRebuild: (prev, next) =>
+                    prev.isConnected != next.isConnected ||
+                    prev.loading != next.loading ||
+                    prev.isConnecting != next.isConnecting ||
+                    prev.errorMessage != next.errorMessage,
+                selector: (_, p) => _ConnectionStatus(
+                  isConnected: p.isConnected,
+                  loading: p.loading,
+                  isConnecting: p.isConnecting,
+                  errorMessage: p.errorMessage,
+                ),
+                builder: (context, status, _) {
+                  if (!status.isConnected &&
+                      !status.loading &&
+                      !status.isConnecting) {
+                    return SliverToBoxAdapter(
                       child: _buildConnectionErrorBanner(
-                          context, provider),
-                    ),
-                  if (provider.saveError != null &&
-                      provider.saveError!.isNotEmpty)
-                    SliverToBoxAdapter(
+                          context, status.errorMessage, () {
+                        context
+                            .read<CaptureProvider>()
+                            .reconnect();
+                      }),
+                    );
+                  }
+                  return const SliverToBoxAdapter(child: SizedBox.shrink());
+                },
+              ),
+              // Save error banner
+              Selector<CaptureProvider, String?>(
+                selector: (_, p) => p.saveError,
+                builder: (context, saveError, _) {
+                  if (saveError != null && saveError.isNotEmpty) {
+                    final theme = Theme.of(context);
+                    return SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                        padding:
+                            const EdgeInsets.fromLTRB(24, 0, 24, 8),
                         child: Text(
-                          provider.saveError!,
-                          style: TextStyle(color: theme.colorScheme.error),
+                          saveError,
+                          style:
+                              TextStyle(color: theme.colorScheme.error),
                         ),
                       ),
-                    ),
-                  if (provider.loading)
-                    const SliverFillRemaining(
+                    );
+                  }
+                  return const SliverToBoxAdapter(child: SizedBox.shrink());
+                },
+              ),
+              // Content: loading / empty / grid
+              Selector<CaptureProvider, _ContentState>(
+                shouldRebuild: (prev, next) =>
+                    prev.loading != next.loading ||
+                    prev.capturesLength != next.capturesLength ||
+                    prev.newNames != next.newNames,
+                selector: (_, p) => _ContentState(
+                  loading: p.loading,
+                  capturesLength: p.captures.length,
+                  newNames: p.newNames,
+                ),
+                builder: (context, contentState, _) {
+                  if (contentState.loading) {
+                    return const SliverFillRemaining(
                       child: Center(child: CircularProgressIndicator()),
-                    )
-                  else if (provider.captures.isEmpty)
-                    const SliverFillRemaining(child: EmptyState())
-                  else
-                    _buildGrid(context, provider),
-                ],
+                    );
+                  }
+                  if (contentState.capturesLength == 0) {
+                    return const SliverFillRemaining(
+                        child: EmptyState());
+                  }
+                  return Consumer<CaptureProvider>(
+                    builder: (context, provider, _) =>
+                        _buildGrid(context, provider),
+                  );
+                },
               ),
             ],
-          );
-        },
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, CaptureProvider provider) {
+  Widget _buildHeader(BuildContext context, _HeaderData data) {
     final theme = Theme.of(context);
+    final provider = context.read<CaptureProvider>();
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 16,
@@ -123,13 +179,13 @@ class _GalleryScreenState extends State<GalleryScreen> {
                     Row(
                       children: [
                         Text(
-                          '${provider.captureCount} file${provider.captureCount != 1 ? 's' : ''} received',
+                          '${data.captureCount} file${data.captureCount != 1 ? 's' : ''} received',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurface
                                 .withValues(alpha: 0.6),
                           ),
                         ),
-                        if (provider.loading)
+                        if (data.loading)
                           Padding(
                             padding: const EdgeInsets.only(left: 8),
                             child: SizedBox(
@@ -144,14 +200,14 @@ class _GalleryScreenState extends State<GalleryScreen> {
                           ),
                         const SizedBox(width: 12),
                         _buildConnectionStatus(
-                            theme, provider),
+                            theme, data),
                       ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
-              if (provider.selectedDirPath == null)
+              if (data.selectedDirPath == null)
                 FilledButton.tonalIcon(
                   onPressed: () => provider.pickDirectory(),
                   icon: const Icon(Icons.folder_open, size: 18),
@@ -173,7 +229,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          provider.selectedDirPath!.split('\\').last,
+                          data.selectedDirPath!.split('\\').last,
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.green.shade300,
@@ -208,8 +264,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   Widget _buildConnectionStatus(
-      ThemeData theme, CaptureProvider provider) {
-    if (provider.isConnecting) {
+      ThemeData theme, _HeaderData data) {
+    if (data.isConnecting) {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -232,7 +288,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
       );
     }
 
-    if (provider.isConnected) {
+    if (data.isConnected) {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -279,7 +335,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   Widget _buildConnectionErrorBanner(
-      BuildContext context, CaptureProvider provider) {
+      BuildContext context, String errorMessage, VoidCallback onReconnect) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
       child: Container(
@@ -295,8 +351,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                provider.errorMessage.isNotEmpty
-                    ? provider.errorMessage
+                errorMessage.isNotEmpty
+                    ? errorMessage
                     : '无法连接到后端服务器',
                 style: TextStyle(
                   fontSize: 12,
@@ -306,7 +362,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
             ),
             const SizedBox(width: 8),
             TextButton.icon(
-              onPressed: () => provider.reconnect(),
+              onPressed: onReconnect,
               icon: const Icon(Icons.refresh, size: 16),
               label: const Text('重连', style: TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(
@@ -323,6 +379,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   Widget _buildGrid(BuildContext context, CaptureProvider provider) {
+    final imageCaptures = provider.imageCaptures;
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       sliver: SliverGrid(
@@ -342,7 +399,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
               onTap: file.isImage
                   ? () {
                       final imageIndex =
-                          provider.imageCaptures.indexOf(file);
+                          imageCaptures.indexOf(file);
                       if (imageIndex >= 0) {
                         _openLightbox(context, imageIndex);
                       }
@@ -355,4 +412,61 @@ class _GalleryScreenState extends State<GalleryScreen> {
       ),
     );
   }
+}
+
+/// Selector data: header portion of CaptureProvider state.
+class _HeaderData {
+  final int captureCount;
+  final bool loading;
+  final bool isConnected;
+  final bool isConnecting;
+  final String? selectedDirPath;
+
+  const _HeaderData({
+    required this.captureCount,
+    required this.loading,
+    required this.isConnected,
+    required this.isConnecting,
+    required this.selectedDirPath,
+  });
+}
+
+/// Selector data: connection status portion.
+class _ConnectionStatus {
+  final bool isConnected;
+  final bool loading;
+  final bool isConnecting;
+  final String errorMessage;
+
+  const _ConnectionStatus({
+    required this.isConnected,
+    required this.loading,
+    required this.isConnecting,
+    required this.errorMessage,
+  });
+}
+
+/// Selector data: content (loading / grid) portion.
+class _ContentState {
+  final bool loading;
+  final int capturesLength;
+  final Set<String> newNames;
+
+  const _ContentState({
+    required this.loading,
+    required this.capturesLength,
+    required this.newNames,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _ContentState &&
+          loading == other.loading &&
+          capturesLength == other.capturesLength &&
+          newNames == other.newNames;
+
+  @override
+  int get hashCode =>
+      loading.hashCode ^ capturesLength.hashCode ^ newNames.hashCode;
 }

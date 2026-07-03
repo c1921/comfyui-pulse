@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../models/capture_file.dart';
 
@@ -8,6 +9,7 @@ class ApiClient {
   String baseUrl;
   HttpClient? _httpClient;
   StreamSubscription<CaptureFile>? _sseSubscription;
+  StreamController<CaptureFile>? _sseController;
 
   ApiClient({required this.baseUrl});
 
@@ -57,6 +59,7 @@ class ApiClient {
     _httpClient!.connectionTimeout = const Duration(seconds: 30);
 
     final controller = StreamController<CaptureFile>.broadcast();
+    _sseController = controller;
 
     _connectSSE(uri, controller, onConnected);
 
@@ -98,9 +101,16 @@ class ApiClient {
         buffer = lines.removeLast();
 
         String? currentData;
-        for (final line in lines) {
+        for (final rawLine in lines) {
+          // Strip \r for CRLF line endings
+          final line = rawLine.endsWith('\r')
+              ? rawLine.substring(0, rawLine.length - 1)
+              : rawLine;
           if (line.startsWith('data: ')) {
             currentData = line.substring(6);
+          } else if (line == 'data:' && currentData == null) {
+            // SSE allows "data:" without a space (empty data field)
+            currentData = '';
           } else if (line.isEmpty && currentData != null) {
             // Empty line signals end of an event
             try {
@@ -123,9 +133,21 @@ class ApiClient {
     }
   }
 
+  /// Download a file by its download URL and return the bytes.
+  Future<Uint8List> downloadFile(String downloadUrl) async {
+    final response = await http.get(Uri.parse(downloadUrl))
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode != 200) {
+      throw HttpException('Download failed: ${response.statusCode}');
+    }
+    return response.bodyBytes;
+  }
+
   /// Cancel the SSE subscription and close the HTTP client.
   void dispose() {
     _sseSubscription?.cancel();
+    _sseController?.close();
+    _sseController = null;
     _httpClient?.close(force: true);
   }
 }

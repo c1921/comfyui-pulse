@@ -12,6 +12,7 @@ class SettingsService {
   /// Initialize the service. Must be called before any read/write.
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
+    assert(_prefs != null, 'SettingsService.init() must be called before accessing settings');
   }
 
   // --- Save directory ---

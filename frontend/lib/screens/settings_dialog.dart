@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/capture_provider.dart';
+import '../services/settings_service.dart';
 
 class SettingsDialog extends StatefulWidget {
   const SettingsDialog({super.key});
@@ -30,6 +31,20 @@ class _SettingsDialogState extends State<SettingsDialog> {
     final url = _urlController.text.trim();
     if (url.isEmpty) return;
 
+    // Validate URL format
+    final parsed = Uri.tryParse(url);
+    if (parsed == null || !parsed.hasScheme || !parsed.hasAuthority) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('请输入有效的 URL（例如 http://127.0.0.1:8088）'),
+            backgroundColor: Colors.red.shade300,
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     try {
@@ -53,7 +68,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
   Future<void> _pickDirectory() async {
     final provider = context.read<CaptureProvider>();
     await provider.pickDirectory();
-    if (mounted) setState(() {});
   }
 
   @override
@@ -98,7 +112,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
               TextField(
                 controller: _urlController,
                 decoration: InputDecoration(
-                  hintText: 'http://127.0.0.1:8088',
+                  hintText: SettingsService.defaultBackendUrl,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   suffixIcon: _isSaving

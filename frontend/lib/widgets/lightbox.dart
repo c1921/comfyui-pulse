@@ -22,17 +22,20 @@ class Lightbox extends StatefulWidget {
 class _LightboxState extends State<Lightbox> {
   late int _currentIndex;
   late PageController _pageController;
+  late FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: _currentIndex);
+    _focusNode = FocusNode()..requestFocus();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -57,7 +60,7 @@ class _LightboxState extends State<Lightbox> {
   @override
   Widget build(BuildContext context) {
     return KeyboardListener(
-      focusNode: FocusNode()..requestFocus(),
+      focusNode: _focusNode,
       onKeyEvent: (event) {
         if (event is KeyDownEvent) {
           if (event.logicalKey == LogicalKeyboardKey.escape) {
@@ -80,6 +83,7 @@ class _LightboxState extends State<Lightbox> {
             },
             itemBuilder: (context, index) {
               final file = widget.images[index];
+              final screenWidth = MediaQuery.of(context).size.width.toInt();
               return InteractiveViewer(
                 maxScale: 5.0,
                 child: Center(
@@ -87,6 +91,7 @@ class _LightboxState extends State<Lightbox> {
                       ? Image.file(
                           File(file.localPath!),
                           fit: BoxFit.contain,
+                          cacheWidth: screenWidth,
                           errorBuilder: (context, error, stackTrace) =>
                               _buildImageError(file),
                         )

@@ -21,43 +21,42 @@ class PulseApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => CaptureProvider(
-        apiClient: ApiClient(baseUrl: 'http://127.0.0.1:8088'),
+        apiClient: ApiClient(baseUrl: SettingsService.defaultBackendUrl),
         settingsService: settingsService,
       ),
       child: MaterialApp(
         title: 'ComfyUI Pulse',
         debugShowCheckedModeBanner: false,
-        theme: _buildTheme(Brightness.dark),
+        theme: _buildTheme(),
         home: const GalleryScreen(),
       ),
     );
   }
 
-  ThemeData _buildTheme(Brightness brightness) {
-    final isDark = brightness == Brightness.dark;
+  ThemeData _buildTheme() {
     return ThemeData(
-      brightness: brightness,
+      brightness: Brightness.dark,
       colorSchemeSeed: Colors.teal,
       useMaterial3: true,
-      scaffoldBackgroundColor: isDark ? const Color(0xFF09090B) : Colors.white,
-      appBarTheme: AppBarTheme(
-        backgroundColor: isDark ? const Color(0xFF09090B) : Colors.white,
-        foregroundColor: isDark ? Colors.white : Colors.black,
+      scaffoldBackgroundColor: const Color(0xFF09090B),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF09090B),
+        foregroundColor: Colors.white,
       ),
-      cardTheme: CardThemeData(
-        color: isDark ? const Color(0xFF18181B) : const Color(0xFFF4F4F5),
+      cardTheme: const CardThemeData(
+        color: Color(0xFF18181B),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: isDark ? Colors.white : Colors.black,
-          foregroundColor: isDark ? Colors.black : Colors.white,
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: isDark ? Colors.white : Colors.black,
+          foregroundColor: Colors.white,
           side: BorderSide(
-            color: isDark ? Colors.white24 : Colors.black26,
+            color: Colors.white24,
           ),
         ),
       ),

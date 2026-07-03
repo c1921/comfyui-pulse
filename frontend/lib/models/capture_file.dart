@@ -5,8 +5,11 @@ class CaptureFile {
   final String mtime;
   final String contentType;
   final bool isImage;
-  bool saved;
-  String? localPath;
+  bool _saved;
+  String? _localPath;
+
+  bool get saved => _saved;
+  String? get localPath => _localPath;
 
   CaptureFile({
     required this.name,
@@ -15,9 +18,16 @@ class CaptureFile {
     required this.mtime,
     required this.contentType,
     required this.isImage,
-    this.saved = false,
-    this.localPath,
-  });
+    bool saved = false,
+    String? localPath,
+  })  : _saved = saved,
+        _localPath = localPath;
+
+  /// Mark this file as saved to disk at [path].
+  void markSaved(String path) {
+    _saved = true;
+    _localPath = path;
+  }
 
   factory CaptureFile.fromJson(Map<String, dynamic> json) {
     return CaptureFile(
@@ -36,6 +46,7 @@ class CaptureFile {
     return '${(size / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
-  /// Build a full download URL by prepending the backend base URL.
-  String downloadUrl(String baseUrl) => '$baseUrl$path';
+  /// Build a full download URL by resolving [path] against [baseUrl].
+  String downloadUrl(String baseUrl) =>
+      Uri.parse(baseUrl).resolve(path).toString();
 }

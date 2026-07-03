@@ -2,31 +2,31 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:http/http.dart' as http;
 import '../models/capture_file.dart';
 import '../services/api_client.dart';
 import '../services/settings_service.dart';
+import '../services/storage_service.dart';
+
+enum _ConnStatus { disconnected, connecting, connected, error }
 
 class CaptureProvider extends ChangeNotifier {
   final ApiClient _apiClient;
   final SettingsService _settingsService;
+  final StorageService _storageService;
 
   final List<CaptureFile> _captures = [];
   final Set<String> _newNames = {};
   final Set<String> _savingFiles = {};
+  final List<Timer> _highlightTimers = [];
   String? _selectedDirPath;
   String? _saveError;
   bool _loading = true;
-  bool _hasError = false;
-  bool _isConnected = false;
-  bool _isConnecting = false;
+  _ConnStatus _connectionStatus = _ConnStatus.disconnected;
   String _errorMessage = '';
 
-  CaptureProvider({
-    required ApiClient apiClient,
-    required SettingsService settingsService,
-  })  : _apiClient = apiClient,
-        _settingsService = settingsService;
+  bool get isConnected => _connectionStatus == _ConnStatus.connected;
+  bool get isConnecting => _connectionStatus == _ConnStatus.connecting;
+  bool get hasError => _connectionStatus == _ConnStatus.error;
 
   // Getters
   List<CaptureFile> get captures => _captures;
@@ -35,49 +35,53 @@ class CaptureProvider extends ChangeNotifier {
   String? get selectedDirPath => _selectedDirPath;
   String? get saveError => _saveError;
   bool get loading => _loading;
-  bool get hasError => _hasError;
-  bool get isConnected => _isConnected;
-  bool get isConnecting => _isConnecting;
   String get errorMessage => _errorMessage;
   List<CaptureFile> get imageCaptures =>
       _captures.where((f) => f.isImage).toList();
   int get captureCount => _captures.length;
 
   StreamSubscription? _sseSubscription;
+  Timer? _notifyDebounceTimer;
 
   /// Initialize: load persisted settings, then load captures and subscribe to SSE.
   Future<void> initialize() async {
-    // Load persisted backend URL and update ApiClient if needed
-    final savedUrl = _settingsService.getBackendUrl();
-    if (savedUrl != _apiClient.baseUrl) {
-      _apiClient.baseUrl = savedUrl;
-    }
+    try {
+      // Load persisted backend URL and update ApiClient if needed
+      final savedUrl = _settingsService.getBackendUrl();
+      if (savedUrl != _apiClient.baseUrl) {
+        _apiClient.baseUrl = savedUrl;
+      }
 
-    // Load persisted save directory
-    final savedDir = _settingsService.getSaveDirectory();
-    if (savedDir != null) {
-      _selectedDirPath = savedDir;
-    }
+      // Load persisted save directory
+      final savedDir = _settingsService.getSaveDirectory();
+      if (savedDir != null) {
+        _selectedDirPath = savedDir;
+      }
 
-    await _loadCaptures();
-    _subscribeToSSE();
+      await _loadCaptures();
+      _subscribeToSSE();
+    } catch (e) {
+      _connectionStatus = _ConnStatus.error;
+      _errorMessage = '初始化失败：$e';
+      _loading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> _loadCaptures() async {
     try {
       _loading = true;
-      _hasError = false;
+      _connectionStatus = _ConnStatus.disconnected;
       notifyListeners();
 
       final list = await _apiClient.fetchCaptures();
-      _isConnected = true;
+      _connectionStatus = _ConnStatus.connected;
       for (final file in list) {
         _addCapture(file, isNew: false);
       }
     } catch (e) {
-      _hasError = true;
+      _connectionStatus = _ConnStatus.error;
       _errorMessage = e.toString();
-      _isConnected = false;
     } finally {
       _loading = false;
       notifyListeners();
@@ -90,13 +94,11 @@ class CaptureProvider extends ChangeNotifier {
         _addCapture(file, isNew: true);
       },
       onConnected: () {
-        _isConnected = true;
-        _isConnecting = false;
+        _connectionStatus = _ConnStatus.connected;
         notifyListeners();
       },
       onError: (error) {
-        _isConnected = false;
-        _isConnecting = false;
+        _connectionStatus = _ConnStatus.disconnected;
         notifyListeners();
       },
     );
@@ -117,12 +119,21 @@ class CaptureProvider extends ChangeNotifier {
       _newNames.add(file.name);
 
       // Remove highlight after 3 seconds
-      Future.delayed(const Duration(seconds: 3), () {
+      final timer = Timer(const Duration(seconds: 3), () {
         _newNames.remove(file.name);
+        _highlightTimers.remove(timer);
         notifyListeners();
       });
+      _highlightTimers.add(timer);
     }
-    notifyListeners();
+    _debouncedNotify();
+  }
+
+  void _debouncedNotify() {
+    _notifyDebounceTimer?.cancel();
+    _notifyDebounceTimer = Timer(const Duration(milliseconds: 50), () {
+      notifyListeners();
+    });
   }
 
   /// Pick a directory for saving files.
@@ -157,22 +168,11 @@ class CaptureProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await http.get(
-          Uri.parse(file.downloadUrl(_apiClient.baseUrl)));
-      if (response.statusCode != 200) {
-        throw HttpException('HTTP ${response.statusCode}');
-      }
-
       final saveDir = Directory(_selectedDirPath!);
-      if (!await saveDir.exists()) {
-        await saveDir.create(recursive: true);
-      }
-
-      final saveFile = File('${saveDir.path}/${file.name}');
-      await saveFile.writeAsBytes(response.bodyBytes);
-      file.saved = true;
-      file.localPath = saveFile.path;
+      final localPath = await _storageService.saveFile(file, saveDir);
+      file.markSaved(localPath);
     } catch (e) {
+      _saveError = '保存 ${file.name} 失败：$e';
       debugPrint('Failed to save ${file.name}: $e');
     } finally {
       _savingFiles.remove(file.name);
@@ -186,33 +186,32 @@ class CaptureProvider extends ChangeNotifier {
   /// Update the backend URL and re-initialize.
   Future<void> updateBackendUrl(String url) async {
     await _settingsService.setBackendUrl(url);
-    _isConnected = false;
+    _connectionStatus = _ConnStatus.disconnected;
     _apiClient.updateBaseUrl(
       url,
       onNewCapture: (file) {
         _addCapture(file, isNew: true);
       },
       onConnected: () {
-        _isConnected = true;
-        _isConnecting = false;
+        _connectionStatus = _ConnStatus.connected;
         notifyListeners();
       },
       onError: (error) {
-        _isConnected = false;
-        _isConnecting = false;
+        _connectionStatus = _ConnStatus.disconnected;
         debugPrint('SSE error after URL change: $error');
       },
     );
+    // Clear captures from the old server before fetching new ones
+    _captures.clear();
+    _newNames.clear();
     // Re-fetch captures from the new server
     await _loadCaptures();
   }
 
   /// Manually reconnect to the backend.
   Future<void> reconnect() async {
-    if (_isConnecting) return;
-    _isConnecting = true;
-    _isConnected = false;
-    _hasError = false;
+    if (_connectionStatus == _ConnStatus.connecting) return;
+    _connectionStatus = _ConnStatus.connecting;
     notifyListeners();
 
     // Cancel old SSE
@@ -233,6 +232,11 @@ class CaptureProvider extends ChangeNotifier {
   @override
   void dispose() {
     _sseSubscription?.cancel();
+    _notifyDebounceTimer?.cancel();
+    for (final timer in _highlightTimers) {
+      timer.cancel();
+    }
+    _highlightTimers.clear();
     _apiClient.dispose();
     super.dispose();
   }
