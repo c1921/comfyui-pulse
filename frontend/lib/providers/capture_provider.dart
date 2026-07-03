@@ -21,8 +21,16 @@ class CaptureProvider extends ChangeNotifier {
   String? _selectedDirPath;
   String? _saveError;
   bool _loading = true;
+  bool _firstSetupDone = false;
   _ConnStatus _connectionStatus = _ConnStatus.disconnected;
   String _errorMessage = '';
+
+  CaptureProvider({
+    required ApiClient apiClient,
+    required SettingsService settingsService,
+  })  : _apiClient = apiClient,
+        _settingsService = settingsService,
+        _storageService = StorageService(apiClient: apiClient);
 
   bool get isConnected => _connectionStatus == _ConnStatus.connected;
   bool get isConnecting => _connectionStatus == _ConnStatus.connecting;
@@ -42,9 +50,20 @@ class CaptureProvider extends ChangeNotifier {
 
   StreamSubscription? _sseSubscription;
   Timer? _notifyDebounceTimer;
+  bool _initialized = false;
+
+  bool get firstSetupDone => _firstSetupDone;
+
+  /// Mark the first-time setup as complete.
+  void markSetupDone() {
+    _firstSetupDone = true;
+    notifyListeners();
+  }
 
   /// Initialize: load persisted settings, then load captures and subscribe to SSE.
   Future<void> initialize() async {
+    if (_initialized) return;
+    _initialized = true;
     try {
       // Load persisted backend URL and update ApiClient if needed
       final savedUrl = _settingsService.getBackendUrl();
@@ -56,6 +75,7 @@ class CaptureProvider extends ChangeNotifier {
       final savedDir = _settingsService.getSaveDirectory();
       if (savedDir != null) {
         _selectedDirPath = savedDir;
+        _firstSetupDone = true;
       }
 
       await _loadCaptures();
@@ -121,7 +141,6 @@ class CaptureProvider extends ChangeNotifier {
       // Remove highlight after 3 seconds
       final timer = Timer(const Duration(seconds: 3), () {
         _newNames.remove(file.name);
-        _highlightTimers.remove(timer);
         notifyListeners();
       });
       _highlightTimers.add(timer);
@@ -169,8 +188,16 @@ class CaptureProvider extends ChangeNotifier {
 
     try {
       final saveDir = Directory(_selectedDirPath!);
-      final localPath = await _storageService.saveFile(file, saveDir);
-      file.markSaved(localPath);
+      final localFile = File('${saveDir.path}/${file.name}');
+
+      if (await localFile.exists()) {
+        // Already saved locally, skip download
+        file.markSaved(localFile.path);
+      } else {
+        // Not on disk, download and save
+        final localPath = await _storageService.saveFile(file, saveDir);
+        file.markSaved(localPath);
+      }
     } catch (e) {
       _saveError = '保存 ${file.name} 失败：$e';
       debugPrint('Failed to save ${file.name}: $e');

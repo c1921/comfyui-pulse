@@ -17,9 +17,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<CaptureProvider>().initialize();
-    });
   }
 
   void _openLightbox(BuildContext context, int index) {

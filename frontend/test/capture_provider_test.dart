@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pulse_app/models/capture_file.dart';
 import 'package:pulse_app/providers/capture_provider.dart';
 import 'package:pulse_app/services/api_client.dart';
 import 'package:pulse_app/services/settings_service.dart';
@@ -39,16 +38,6 @@ void main() {
     });
 
     test('clearAll clears captures and newNames', () async {
-      // Add via internal mechanism using a file
-      final file = CaptureFile(
-        name: 'test.png',
-        path: '/downloads/test.png',
-        size: 1024,
-        mtime: '2026-01-01T00:00:00.000',
-        contentType: 'image/png',
-        isImage: true,
-      );
-
       // Access internal list through getter (it starts empty)
       expect(provider.captures, isEmpty);
 
