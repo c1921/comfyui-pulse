@@ -107,13 +107,14 @@ class CaptureProvider extends ChangeNotifier {
     if (_captures.any((c) => c.name == file.name)) return;
 
     _captures.insert(0, file);
+
+    /// Auto-save to selected directory for all image captures
+    if (_selectedDirPath != null && file.isImage) {
+      _trySaveFile(file);
+    }
+
     if (isNew) {
       _newNames.add(file.name);
-
-      /// Auto-save to selected directory
-      if (_selectedDirPath != null && file.isImage) {
-        _trySaveFile(file);
-      }
 
       // Remove highlight after 3 seconds
       Future.delayed(const Duration(seconds: 3), () {
