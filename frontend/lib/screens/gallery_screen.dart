@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/capture_provider.dart';
+import '../screens/settings_dialog.dart';
 import '../widgets/capture_card.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/lightbox.dart';
@@ -178,6 +179,17 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   ),
                 ),
               const SizedBox(width: 12),
+              IconButton(
+                icon: const Icon(Icons.settings, size: 20),
+                tooltip: '设置',
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) => const SettingsDialog(),
+                  );
+                },
+              ),
+              const SizedBox(width: 4),
               OutlinedButton(
                 onPressed: () => provider.clearAll(),
                 child: const Text('Clear'),

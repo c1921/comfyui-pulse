@@ -5,9 +5,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import '../models/capture_file.dart';
 import '../services/api_client.dart';
+import '../services/settings_service.dart';
 
 class CaptureProvider extends ChangeNotifier {
   final ApiClient _apiClient;
+  final SettingsService _settingsService;
 
   final List<CaptureFile> _captures = [];
   final Set<String> _newNames = {};
@@ -18,7 +20,11 @@ class CaptureProvider extends ChangeNotifier {
   bool _hasError = false;
   String _errorMessage = '';
 
-  CaptureProvider({required ApiClient apiClient}) : _apiClient = apiClient;
+  CaptureProvider({
+    required ApiClient apiClient,
+    required SettingsService settingsService,
+  })  : _apiClient = apiClient,
+        _settingsService = settingsService;
 
   // Getters
   List<CaptureFile> get captures => _captures;
@@ -35,8 +41,20 @@ class CaptureProvider extends ChangeNotifier {
 
   StreamSubscription? _sseSubscription;
 
-  /// Initialize: load captures and subscribe to SSE.
+  /// Initialize: load persisted settings, then load captures and subscribe to SSE.
   Future<void> initialize() async {
+    // Load persisted backend URL and update ApiClient if needed
+    final savedUrl = _settingsService.getBackendUrl();
+    if (savedUrl != _apiClient.baseUrl) {
+      _apiClient.baseUrl = savedUrl;
+    }
+
+    // Load persisted save directory
+    final savedDir = _settingsService.getSaveDirectory();
+    if (savedDir != null) {
+      _selectedDirPath = savedDir;
+    }
+
     await _loadCaptures();
     _subscribeToSSE();
   }
@@ -102,6 +120,7 @@ class CaptureProvider extends ChangeNotifier {
       );
       if (result != null) {
         _selectedDirPath = result;
+        _settingsService.setSaveDirectory(result);
         notifyListeners();
 
         // Re-save any existing unsaved images
@@ -152,6 +171,25 @@ class CaptureProvider extends ChangeNotifier {
       _savingFiles.remove(file.name);
       notifyListeners();
     }
+  }
+
+  /// Get the current backend URL.
+  String get backendUrl => _settingsService.getBackendUrl();
+
+  /// Update the backend URL and re-initialize.
+  Future<void> updateBackendUrl(String url) async {
+    await _settingsService.setBackendUrl(url);
+    _apiClient.updateBaseUrl(
+      url,
+      onNewCapture: (file) {
+        _addCapture(file, isNew: true);
+      },
+      onError: (error) {
+        debugPrint('SSE error after URL change: $error');
+      },
+    );
+    // Re-fetch captures from the new server
+    await _loadCaptures();
   }
 
   /// Clear all captures.

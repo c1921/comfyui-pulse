@@ -5,11 +5,26 @@ import 'package:http/http.dart' as http;
 import '../models/capture_file.dart';
 
 class ApiClient {
-  final String baseUrl;
+  String baseUrl;
   HttpClient? _httpClient;
   StreamSubscription<CaptureFile>? _sseSubscription;
 
   ApiClient({required this.baseUrl});
+
+  /// Update the backend base URL and re-subscribe to SSE events.
+  /// Pass a [onNewCapture] callback to reconnect with the new URL.
+  void updateBaseUrl(String newUrl,
+      {void Function(CaptureFile file)? onNewCapture,
+      void Function(Object error)? onError}) {
+    if (baseUrl == newUrl) return;
+    baseUrl = newUrl;
+
+    // Reconnect SSE if it was previously subscribed and a callback is given
+    if (_httpClient != null && onNewCapture != null) {
+      dispose();
+      subscribeEvents(onNewCapture: onNewCapture, onError: onError);
+    }
+  }
 
   /// Fetch the list of all captured files.
   Future<List<CaptureFile>> fetchCaptures() async {

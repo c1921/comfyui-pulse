@@ -1,21 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/api_client.dart';
+import 'services/settings_service.dart';
 import 'providers/capture_provider.dart';
 import 'screens/gallery_screen.dart';
 
-void main() {
-  runApp(const PulseApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final settingsService = SettingsService();
+  await settingsService.init();
+  runApp(PulseApp(settingsService: settingsService));
 }
 
 class PulseApp extends StatelessWidget {
-  const PulseApp({super.key});
+  final SettingsService settingsService;
+
+  const PulseApp({super.key, required this.settingsService});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => CaptureProvider(
         apiClient: ApiClient(baseUrl: 'http://127.0.0.1:8088'),
+        settingsService: settingsService,
       ),
       child: MaterialApp(
         title: 'ComfyUI Pulse',
