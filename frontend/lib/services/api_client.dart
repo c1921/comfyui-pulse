@@ -15,14 +15,18 @@ class ApiClient {
   /// Pass a [onNewCapture] callback to reconnect with the new URL.
   void updateBaseUrl(String newUrl,
       {void Function(CaptureFile file)? onNewCapture,
-      void Function(Object error)? onError}) {
+      void Function(Object error)? onError,
+      void Function()? onConnected}) {
     if (baseUrl == newUrl) return;
     baseUrl = newUrl;
 
     // Reconnect SSE if it was previously subscribed and a callback is given
     if (_httpClient != null && onNewCapture != null) {
       dispose();
-      subscribeEvents(onNewCapture: onNewCapture, onError: onError);
+      subscribeEvents(
+          onNewCapture: onNewCapture,
+          onError: onError,
+          onConnected: onConnected);
     }
   }
 
@@ -46,6 +50,7 @@ class ApiClient {
   StreamSubscription<CaptureFile> subscribeEvents({
     required void Function(CaptureFile file) onNewCapture,
     void Function(Object error)? onError,
+    void Function()? onConnected,
   }) {
     final uri = Uri.parse('$baseUrl/api/events');
     _httpClient = HttpClient();
@@ -53,7 +58,7 @@ class ApiClient {
 
     final controller = StreamController<CaptureFile>.broadcast();
 
-    _connectSSE(uri, controller);
+    _connectSSE(uri, controller, onConnected);
 
     _sseSubscription = controller.stream.listen(
       onNewCapture,
@@ -67,6 +72,7 @@ class ApiClient {
   void _connectSSE(
     Uri uri,
     StreamController<CaptureFile> controller,
+    void Function()? onConnected,
   ) async {
     try {
       final request = await _httpClient!.getUrl(uri);
@@ -81,6 +87,8 @@ class ApiClient {
         );
         return;
       }
+
+      onConnected?.call();
 
       String buffer = '';
       await for (final chunk in response.transform(utf8.decoder)) {

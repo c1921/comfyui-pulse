@@ -11,6 +11,4 @@ RUN mkdir -p backend/downloads backend/requests
 
 EXPOSE 8088
 
-CMD ["python", "backend/main.py", 
-     "--host", "0.0.0.0", 
-     "--save-request-info"]
+CMD ["python", "backend/main.py", "--host", "0.0.0.0", "--save-request-info"]

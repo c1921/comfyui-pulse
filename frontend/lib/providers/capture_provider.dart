@@ -18,6 +18,8 @@ class CaptureProvider extends ChangeNotifier {
   String? _saveError;
   bool _loading = true;
   bool _hasError = false;
+  bool _isConnected = false;
+  bool _isConnecting = false;
   String _errorMessage = '';
 
   CaptureProvider({
@@ -34,6 +36,8 @@ class CaptureProvider extends ChangeNotifier {
   String? get saveError => _saveError;
   bool get loading => _loading;
   bool get hasError => _hasError;
+  bool get isConnected => _isConnected;
+  bool get isConnecting => _isConnecting;
   String get errorMessage => _errorMessage;
   List<CaptureFile> get imageCaptures =>
       _captures.where((f) => f.isImage).toList();
@@ -66,12 +70,14 @@ class CaptureProvider extends ChangeNotifier {
       notifyListeners();
 
       final list = await _apiClient.fetchCaptures();
+      _isConnected = true;
       for (final file in list) {
         _addCapture(file, isNew: false);
       }
     } catch (e) {
       _hasError = true;
       _errorMessage = e.toString();
+      _isConnected = false;
     } finally {
       _loading = false;
       notifyListeners();
@@ -83,8 +89,15 @@ class CaptureProvider extends ChangeNotifier {
       onNewCapture: (file) {
         _addCapture(file, isNew: true);
       },
+      onConnected: () {
+        _isConnected = true;
+        _isConnecting = false;
+        notifyListeners();
+      },
       onError: (error) {
-        // SSE will auto-reconnect on next event
+        _isConnected = false;
+        _isConnecting = false;
+        notifyListeners();
       },
     );
   }
@@ -179,17 +192,41 @@ class CaptureProvider extends ChangeNotifier {
   /// Update the backend URL and re-initialize.
   Future<void> updateBackendUrl(String url) async {
     await _settingsService.setBackendUrl(url);
+    _isConnected = false;
     _apiClient.updateBaseUrl(
       url,
       onNewCapture: (file) {
         _addCapture(file, isNew: true);
       },
+      onConnected: () {
+        _isConnected = true;
+        _isConnecting = false;
+        notifyListeners();
+      },
       onError: (error) {
+        _isConnected = false;
+        _isConnecting = false;
         debugPrint('SSE error after URL change: $error');
       },
     );
     // Re-fetch captures from the new server
     await _loadCaptures();
+  }
+
+  /// Manually reconnect to the backend.
+  Future<void> reconnect() async {
+    if (_isConnecting) return;
+    _isConnecting = true;
+    _isConnected = false;
+    _hasError = false;
+    notifyListeners();
+
+    // Cancel old SSE
+    _sseSubscription?.cancel();
+    _apiClient.dispose();
+
+    await _loadCaptures();
+    _subscribeToSSE();
   }
 
   /// Clear all captures.

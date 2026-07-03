@@ -62,6 +62,14 @@ class _GalleryScreenState extends State<GalleryScreen> {
                     SliverToBoxAdapter(
                       child: _buildSavePrompt(context),
                     ),
+                  if (!provider.isConnected &&
+                      !provider.loading &&
+                      !provider.isConnecting &&
+                      provider.captures.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _buildConnectionErrorBanner(
+                          context, provider),
+                    ),
                   if (provider.saveError != null &&
                       provider.saveError!.isNotEmpty)
                     SliverToBoxAdapter(
@@ -139,6 +147,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
                               ),
                             ),
                           ),
+                        const SizedBox(width: 12),
+                        _buildConnectionStatus(
+                            theme, provider),
                       ],
                     ),
                   ],
@@ -223,6 +234,121 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   fontSize: 13,
                   color: Colors.amber.shade200,
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConnectionStatus(
+      ThemeData theme, CaptureProvider provider) {
+    if (provider.isConnecting) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 10,
+            height: 10,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '连接中…',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (provider.isConnected) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: Colors.green.shade400,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '已连接',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: Colors.green.shade300,
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Disconnected
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: Colors.red.shade400,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          '连接断开',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: Colors.red.shade300,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConnectionErrorBanner(
+      BuildContext context, CaptureProvider provider) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.red.withValues(alpha: 0.1),
+          border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.cloud_off, size: 18, color: Colors.red.shade300),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                provider.errorMessage.isNotEmpty
+                    ? provider.errorMessage
+                    : '无法连接到后端服务器',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.red.shade200,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton.icon(
+              onPressed: () => provider.reconnect(),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('重连', style: TextStyle(fontSize: 12)),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red.shade300,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),
           ],
